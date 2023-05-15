@@ -3,31 +3,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Threads */
-#include <pthread.h>
+#include "mood_thieves/utils.hpp"
 
-/* Semaphores: sem_init, sem_destroy, sem_post, sem_wait */
-// #include <semaphore.h>
-/* Flags for open */
-// #include <fcntl.h>
-
-/* Boolean */
-#define TRUE 1
-#define FALSE 0
-
-/* Message types */
-#define FINISH 1
-#define APP_MSG 2
-
-char passive = FALSE;
-
-pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-
-typedef struct
+namespace mood_thieves
 {
-    int appdata;
-    int other_field; // You can change the name to something more appropriate
-} packet_t;
+
+struct thread_data
+{
+    // Personal clock
+    // int clock;
+    // FIFO queue of messages
+    // std::queue<Message> queue;
+};
 
 void startFunc(int rank, int size)
 {
@@ -35,41 +22,28 @@ void startFunc(int rank, int size)
     printf("Finishing %d of %d\n", rank, size);
 }
 
+} // namespace mood_thieves
+
 int main(int argc, char **argv)
 {
-    printf("Beginning\n");
     int provided;
-
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
-    switch (provided)
+    int err = mood_thieves::utils::check_thread_support(provided);
+
+    if (err == -1)
     {
-    case MPI_THREAD_SINGLE:
-        printf("No thread support, exiting\n");
-        // We have to exit
-        fprintf(stderr, "Insufficient thread support - exiting!\n");
-        MPI_Finalize();
-        exit(-1);
-        break;
-    case MPI_THREAD_FUNNELED:
-        printf("Only threads that called mpi_init_thread can make calls to the MPI library\n");
-        break;
-    case MPI_THREAD_SERIALIZED:
-        // Locks are needed around MPI library calls
-        printf("Only one thread at a time can make calls to the MPI library\n");
-        break;
-    case MPI_THREAD_MULTIPLE:
-        // Everything is fine
-        break;
-    default:
-        printf("Nobody knows anything\n");
+        printf("Error: MPI does not have MPI_THREAD_MULTIPLE support\n");
+        MPI_Abort(MPI_COMM_WORLD, err);
+        return 1;
     }
 
     int size, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    startFunc(rank, size);
+    mood_thieves::startFunc(rank, size);
 
     MPI_Finalize();
+    return 0;
 }
