@@ -3,27 +3,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "mood_thieves/mood_thieves.hpp"
 #include "mood_thieves/utils.hpp"
-
-namespace mood_thieves
-{
 
 void startFunc(int rank, int size)
 {
     printf("Starting %d of %d\n", rank, size);
 
-    // FIXME: Use data
-    [[maybe_unused]] utils::thread_data data = {0, rank};
-
     MPI_Datatype message_type;
-    utils::initialize_message_type(message_type);
+    mood_thieves::utils::initialize_message_type(message_type);
 
-    utils::free_message_type(message_type);
+    mood_thieves::MoodThieve mood_thieve(message_type, rank, size);
+    mood_thieve.start();
+
+    mood_thieves::utils::free_message_type(message_type);
 
     printf("Finishing %d of %d\n", rank, size);
 }
-
-} // namespace mood_thieves
 
 int main(int argc, char **argv)
 {
@@ -43,7 +39,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    mood_thieves::startFunc(rank, size);
+    startFunc(rank, size);
 
     MPI_Finalize();
     return 0;

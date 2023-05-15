@@ -16,30 +16,33 @@ include_directories(
 
 ################
 
-add_library(mood_thieves_utils
-    src/utils.cpp
-)
-
+add_library(mood_thieves_utils src/utils.cpp)
 target_link_libraries(mood_thieves_utils ${MPI_LIBRARIES})
 
-################
-
-add_executable(mood_thieves
-    src/main.cpp
-)
-
+add_library(mood_thieves src/mood_thieves.cpp)
 target_link_libraries(mood_thieves mood_thieves_utils)
 
 ################
 
-install(TARGETS mood_thieves mood_thieves_utils
+add_executable(main
+    src/main.cpp
+)
+
+target_link_libraries(main
+    mood_thieves_utils
+    mood_thieves
+)
+
+################
+
+install(TARGETS main mood_thieves mood_thieves_utils
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
 )
 
 add_custom_target(run
-    COMMAND mpirun -np 4 mood_thieves
-    DEPENDS mood_thieves
+    COMMAND mpirun -np 4 main
+    DEPENDS main
     WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
 )
 
