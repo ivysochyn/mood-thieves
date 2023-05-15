@@ -1,5 +1,3 @@
-#include <mpi.h>
-
 #include "mood_thieves/utils.hpp"
 
 namespace mood_thieves
@@ -30,6 +28,23 @@ int check_thread_support(int provided)
     }
     return 0;
 }
+
+void initialize_message_type(MPI_Datatype &MPI_PAKIET_T)
+{
+    const int nitems = 2;
+    int blocklengths[nitems] = {1, 1};
+    MPI_Datatype typy[nitems] = {MPI_INT, MPI_INT};
+    MPI_Aint offsets[nitems];
+
+    // Set the offsets for each field
+    offsets[0] = offsetof(LamportClock, clock);
+    offsets[1] = offsetof(LamportClock, id);
+
+    MPI_Type_create_struct(nitems, blocklengths, offsets, typy, &MPI_PAKIET_T);
+    MPI_Type_commit(&MPI_PAKIET_T);
+}
+
+void free_message_type(MPI_Datatype &MPI_PAKIET_T) { MPI_Type_free(&MPI_PAKIET_T); }
 
 } // namespace utils
 } // namespace mood_thieves

@@ -8,17 +8,18 @@
 namespace mood_thieves
 {
 
-struct thread_data
-{
-    // Personal clock
-    // int clock;
-    // FIFO queue of messages
-    // std::queue<Message> queue;
-};
-
 void startFunc(int rank, int size)
 {
     printf("Starting %d of %d\n", rank, size);
+
+    // FIXME: Use data
+    [[maybe_unused]] utils::thread_data data = {0, rank};
+
+    MPI_Datatype message_type;
+    utils::initialize_message_type(message_type);
+
+    utils::free_message_type(message_type);
+
     printf("Finishing %d of %d\n", rank, size);
 }
 
