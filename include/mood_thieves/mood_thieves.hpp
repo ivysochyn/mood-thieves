@@ -31,6 +31,21 @@ private:
     void sendRequest(int resource_type);
 
     /**
+     * Acknowledge to a specific thief that the message has been received.
+     *
+     * @param resource_type The type of resource to acknowledge about.
+     * @param thief_id The identifier of the thief to acknowledge to.
+     */
+    void sendAck(int resource_type, int thief_id);
+
+    /**
+     * Sends the release message to all other thieves including itself.
+     *
+     * @param resource_type The type of resource to release.
+     */
+    void sendRelease(int resource_type);
+
+    /**
      * Receives messages from other thieves until the end flag is set.
      */
     void receiveMessages();

@@ -37,6 +37,12 @@ void MoodThieve::receiveMessages()
         case utils::MessageType::REQUEST:
             printf("Thief %d received REQUEST from %d\n", clock.id, status.MPI_SOURCE);
             break;
+        case utils::MessageType::RELEASE:
+            printf("Thief %d received RELEASE from %d\n", clock.id, status.MPI_SOURCE);
+            break;
+        case utils::MessageType::ACK:
+            printf("Thief %d received ACK from %d\n", clock.id, status.MPI_SOURCE);
+            break;
         default:
             printf("[WARNING]: Thief %d received UNKNOWN message from %d\n", clock.id, status.MPI_SOURCE);
             break;
@@ -48,7 +54,13 @@ void MoodThieve::start()
 {
     MPI_Barrier(MPI_COMM_WORLD);
 
+    // TODO: Replace with business logic
     sendRequest(utils::ResourceType::WEAPON);
+    sendRelease(utils::ResourceType::WEAPON);
+    for (int i = 0; i < size; i++)
+    {
+        sendAck(utils::ResourceType::WEAPON, i);
+    }
 
     // FIXME: Wait for 1 second
     sleep(1);
@@ -58,6 +70,18 @@ void MoodThieve::sendRequest(int resource_type)
 {
     clock.increment();
     sendMessage(utils::MessageType::REQUEST, resource_type);
+}
+
+void MoodThieve::sendAck(int resource_type, int thief_id)
+{
+    utils::message_data_t message_data = {clock, resource_type};
+    MPI_Send(&message_data, 1, this->message_type, thief_id, utils::MessageType::ACK, MPI_COMM_WORLD);
+}
+
+void MoodThieve::sendRelease(int resource_type)
+{
+    clock.increment();
+    sendMessage(utils::MessageType::RELEASE, resource_type);
 }
 
 void MoodThieve::sendMessage(int message_type, int resource_type)
