@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <mpi.h>
+#include <thread>
 
 #include "mood_thieves/utils.hpp"
 
@@ -28,9 +30,17 @@ private:
      */
     void sendRequest(int resource_type);
 
+    /**
+     * Receives messages from other thieves until the end flag is set.
+     */
+    void receiveMessages();
+
     utils::LamportClock clock; ///< The Lamport clock.
     MPI_Datatype message_type; ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
+
+    std::atomic<bool> end{false}; ///< Flag to indicate that the thief receiving thread should end.
+    std::thread receiving_thread; ///< The thread that receives messages from other thieves.
 
 public:
     /**
@@ -45,7 +55,7 @@ public:
     /**
      * Destructor
      */
-    ~MoodThieve(){};
+    ~MoodThieve();
 
     /**
      * Start the thief.
