@@ -7,19 +7,50 @@ namespace mood_thieves
 namespace utils
 {
 
-struct LamportClock
+// Enum representing the resource type
+enum ResourceType
 {
-    int clock;
-    int id;
+    WEAPON,
+    LABORATORY
+};
+
+// Enum representing the message type
+enum MessageType
+{
+    REQUEST,
+    ACK,
+    RELEASE
 };
 
 /**
- * Struct to hold data for each thread.
+ * Struct to hold the Lamport clock and the id of the thread.
  */
-struct thread_data
+struct LamportClock
+{
+    /**
+     * Increment the clock by one.
+     */
+    void increment() { clock++; }
+
+    /**
+     * Decrement the clock by one.
+     */
+    void decrement() { clock--; }
+
+    int clock; ///< Lamport clock
+    int id;    ///< Id of the thread
+};
+
+/**
+ * Struct to hold data for a messages to send.
+ */
+struct message_data_t
 {
     // Personal clock for each thread
     LamportClock clock;
+
+    // Type of the util the message is about
+    int resource_type;
 };
 
 /**
