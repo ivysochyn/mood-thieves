@@ -54,6 +54,18 @@ struct message_data_t
 };
 
 /**
+ * Struct to hold a message to receive.
+ */
+struct message_t
+{
+    // Type of the message
+    int type;
+
+    // Data of the message
+    message_data_t data;
+};
+
+/**
  * Check the thread support level of MPI.
  *
  * @param provided The thread support level provided by MPI.

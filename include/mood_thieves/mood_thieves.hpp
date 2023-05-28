@@ -3,6 +3,7 @@
 #include <atomic>
 #include <mpi.h>
 #include <thread>
+#include <vector>
 
 #include "mood_thieves/utils.hpp"
 
@@ -54,8 +55,9 @@ private:
     MPI_Datatype message_type; ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
 
-    std::atomic<bool> end{false}; ///< Flag to indicate that the thief receiving thread should end.
-    std::thread receiving_thread; ///< The thread that receives messages from other thieves.
+    std::atomic<bool> end{false};                 ///< Flag to indicate that the thief receiving thread should end.
+    std::thread receiving_thread;                 ///< The thread that receives messages from other thieves.
+    std::vector<utils::message_t> message_vector; ///< The queue of messages received from other thieves.
 
 public:
     /**

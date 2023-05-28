@@ -1,4 +1,6 @@
 #include "mood_thieves/mood_thieves.hpp"
+#define DEBUG false
+#include <algorithm>
 
 namespace mood_thieves
 {
@@ -17,7 +19,7 @@ MoodThieve::~MoodThieve()
 
 void MoodThieve::receiveMessages()
 {
-    utils::message_data_t message_data;
+    utils::message_data_t message_data = {utils::LamportClock{-1, -1}, -1};
     MPI_Status status;
     int message_available = 0;
     while (this->end.load() == false)
@@ -32,21 +34,19 @@ void MoodThieve::receiveMessages()
 
         MPI_Recv(&message_data, 1, this->message_type, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        switch (status.MPI_TAG)
+        if (DEBUG)
         {
-        case utils::MessageType::REQUEST:
-            printf("Thief %d received REQUEST from %d\n", clock.id, status.MPI_SOURCE);
-            break;
-        case utils::MessageType::RELEASE:
-            printf("Thief %d received RELEASE from %d\n", clock.id, status.MPI_SOURCE);
-            break;
-        case utils::MessageType::ACK:
-            printf("Thief %d received ACK from %d\n", clock.id, status.MPI_SOURCE);
-            break;
-        default:
-            printf("[WARNING]: Thief %d received UNKNOWN message from %d\n", clock.id, status.MPI_SOURCE);
-            break;
+            printf("[DEBUG] Thief %d received message from %d with tag %d", this->clock.id, status.MPI_SOURCE,
+                   status.MPI_TAG);
+            printf(" with clock %d and with resource %d\n", message_data.clock.clock, message_data.resource_type);
         }
+        utils::message_t message = {status.MPI_TAG, message_data};
+        message_vector.push_back(message);
+
+        // Sort the vector by clock
+        std::sort(message_vector.begin(), message_vector.end(),
+                  [](const utils::message_t &a, const utils::message_t &b)
+                  { return a.data.clock.clock < b.data.clock.clock; });
     }
 }
 
@@ -56,7 +56,7 @@ void MoodThieve::start()
 
     // TODO: Replace with business logic
     sendRequest(utils::ResourceType::WEAPON);
-    sendRelease(utils::ResourceType::WEAPON);
+    sendRelease(utils::ResourceType::LABORATORY);
     for (int i = 0; i < size; i++)
     {
         sendAck(utils::ResourceType::WEAPON, i);
