@@ -51,6 +51,13 @@ private:
      */
     void receiveMessages();
 
+    /**
+     * Checks whether thieve's clock is the smallest among all other thieves.
+     *
+     * @return True if the thief's clock is the smallest, false otherwise.
+     */
+    bool isSmallestClock();
+
     utils::LamportClock clock; ///< The Lamport clock.
     MPI_Datatype message_type; ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
@@ -58,6 +65,7 @@ private:
     std::atomic<bool> end{false};                 ///< Flag to indicate that the thief receiving thread should end.
     std::thread receiving_thread;                 ///< The thread that receives messages from other thieves.
     std::vector<utils::message_t> message_vector; ///< The queue of messages received from other thieves.
+    int *clocks;                                  ///< The Lamport clocks of other thieves.
 
 public:
     /**

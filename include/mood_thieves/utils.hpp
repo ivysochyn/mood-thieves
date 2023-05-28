@@ -37,6 +37,12 @@ struct LamportClock
      */
     void decrement() { clock--; }
 
+    /**
+     * Update the clock with the maximum of the current clock and the given clock.
+     * @param other_clock The clock to compare with.
+     */
+    void update(const LamportClock &other_clock) { clock = std::max(clock, other_clock.clock); }
+
     int clock; ///< Lamport clock
     int id;    ///< Id of the thread
 };
