@@ -35,6 +35,7 @@ void MoodThieve::receiveMessages()
         {
             continue;
         }
+        message_available = 0;
 
         message_data = {-1, -1, -1};
         MPI_Recv(&message_data, 1, msg_t, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -48,7 +49,7 @@ void MoodThieve::receiveMessages()
         }
         utils::message_t message = {status.MPI_TAG, message_data};
 
-        // Update the clock
+        // Compare clocks
         clock.lock();
         clock.update(message_data.clock);
         clock.increment();
@@ -73,6 +74,10 @@ void MoodThieve::receiveMessages()
                           }
                       });
             message_data_vector_mutex.unlock();
+            if (message.data.id == clock.id)
+            {
+                cv.notify_one();
+            }
             clock.lock();
             clock.increment();
             sendAck(message_data.resource_type, message_data.id);
@@ -81,12 +86,20 @@ void MoodThieve::receiveMessages()
         else if (status.MPI_TAG == utils::MessageType::RELEASE)
         {
             // Remove the message from the vector of messages
-            message_data_vector_mutex.unlock();
+            message_data_vector_mutex.lock();
             message_data_vector.erase(std::remove_if(message_data_vector.begin(), message_data_vector.end(),
                                                      [message](const utils::message_data_t &m)
                                                      { return m.id == message.data.id; }),
                                       message_data_vector.end());
-            message_data_vector_mutex.unlock();
+            if (message_data_vector.size() > 0 && message_data_vector[0].id == clock.id)
+            {
+                message_data_vector_mutex.unlock();
+                cv.notify_one();
+            }
+            else
+            {
+                message_data_vector_mutex.unlock();
+            }
         }
     }
 }
@@ -94,13 +107,7 @@ void MoodThieve::receiveMessages()
 void MoodThieve::business_logic()
 {
     MPI_Barrier(MPI_COMM_WORLD);
-    if (clock.id == 0)
-    {
-        clock.lock();
-        clock.increment();
-        sendRequest(utils::ResourceType::WEAPON);
-        clock.unlock();
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
     while (1)
     {
         if (end.load())
@@ -108,42 +115,58 @@ void MoodThieve::business_logic()
             break;
         }
 
-        // if can't find a request with clock id equal to this clock.id
+        // Check whether in a queue
         message_data_vector_mutex.lock();
         if (std::find_if(message_data_vector.begin(), message_data_vector.end(),
                          [this](const utils::message_data_t &m)
                          { return m.id == this->clock.id; }) == message_data_vector.end())
         {
-            // NOTE: Possible deadlock here
+            // Send request for a critical section
             clock.lock();
             clock.increment();
             sendRequest(utils::ResourceType::WEAPON);
             clock.unlock();
-        }
-        message_data_vector_mutex.unlock();
+            message_data_vector_mutex.unlock();
 
+            // Wait until this process request is in the queue
+            std::unique_lock<std::mutex> lk(cv_mutex);
+            cv.wait(lk);
+        }
+        else
+        {
+            message_data_vector_mutex.unlock();
+        }
+
+        // Wait until the first message in the queue is the current process
         message_data_vector_mutex.lock();
-        if (message_data_vector.size() == 0)
+        if (message_data_vector[0].id != clock.id)
         {
             message_data_vector_mutex.unlock();
-            continue;
+            std::unique_lock<std::mutex> lk(cv_mutex);
+            cv.wait(lk);
+        }
+        else
+        {
+            message_data_vector_mutex.unlock();
         }
 
-        // If the first message is from the thief itself
-        if (message_data_vector[0].id == clock.id)
-        {
-            // FIXME: Remove this message
-            message_data_vector_mutex.unlock();
-            printf("Thief %d is stealing the weapon\n", clock.id);
-            sleep(3);
-            clock.lock();
-            clock.increment();
-            sendRelease(utils::ResourceType::WEAPON);
-            clock.unlock();
-            // FIXME: Remove this message
-            printf("Thief %d has released the weapon\n", clock.id);
-            continue;
-        }
+        // Critical section
+        printf("\n[%d] STEAL\n", clock.id);
+        sleep(3);
+        printf("[%d] RELEASE\n", clock.id);
+
+        // Leave the critical section and send release message
+        clock.lock();
+        clock.increment();
+        sendRelease(utils::ResourceType::WEAPON);
+        clock.unlock();
+
+        // Remove the message from the vector of messages (in order not to re-enter the critical section)
+        message_data_vector_mutex.lock();
+        message_data_vector.erase(std::remove_if(message_data_vector.begin(), message_data_vector.end(),
+                                                 [this](const utils::message_data_t &m)
+                                                 { return m.id == this->clock.id; }),
+                                  message_data_vector.end());
         message_data_vector_mutex.unlock();
     }
 }

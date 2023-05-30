@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <mpi.h>
 #include <mutex>
 #include <thread>
@@ -61,6 +62,8 @@ private:
     std::atomic<bool> end{false};         ///< Flag to indicate that the thief receiving thread should end.
     std::mutex message_data_vector_mutex; ///< Mutex to protect the message data vector.
     std::thread logic_thread;             ///< The thread responsible for handling business logic.
+    std::condition_variable cv;           ///< Condition variable to unsleep the business logic thread;
+    std::mutex cv_mutex;                  ///< Mutex to protect the condition variable.
 
     std::vector<utils::message_data_t> message_data_vector; ///< The queue of messages received from other thieves.
 
