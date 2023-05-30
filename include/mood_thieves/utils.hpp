@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mpi.h>
+#include <mutex>
 
 namespace mood_thieves
 {
@@ -23,40 +24,13 @@ enum MessageType
 };
 
 /**
- * Struct to hold the Lamport clock and the id of the thread.
- */
-struct LamportClock
-{
-    /**
-     * Increment the clock by one.
-     */
-    void increment() { clock++; }
-
-    /**
-     * Decrement the clock by one.
-     */
-    void decrement() { clock--; }
-
-    /**
-     * Update the clock with the maximum of the current clock and the given clock.
-     * @param other_clock The clock to compare with.
-     */
-    void update(const LamportClock &other_clock) { clock = std::max(clock, other_clock.clock); }
-
-    int clock; ///< Lamport clock
-    int id;    ///< Id of the thread
-};
-
-/**
  * Struct to hold data for a messages to send.
  */
 struct message_data_t
 {
-    // Personal clock for each thread
-    LamportClock clock;
-
-    // Type of the util the message is about
-    int resource_type;
+    int id;            ///< Id of the thread
+    int clock;         ///< Lamport clock value
+    int resource_type; ///< Type of the resource
 };
 
 /**
@@ -64,11 +38,58 @@ struct message_data_t
  */
 struct message_t
 {
-    // Type of the message
-    int type;
+    int type;            ///< Type of the message
+    message_data_t data; ///< Data of the message
+};
 
-    // Data of the message
-    message_data_t data;
+/**
+ * Struct to hold the Lamport clock and the id of the thread.
+ */
+struct LamportClock
+{
+    /**
+     * Lock the clock.
+     *
+     * Applies the mutex to the clock.
+     */
+    void lock() { _mutex.lock(); }
+
+    /**
+     * Unlock the clock.
+     *
+     * Releases the mutex from the clock.
+     */
+    void unlock() { _mutex.unlock(); }
+
+    /**
+     * Update the clock with the maximum of the current clock and the given clock.
+     *
+     * @param other_clock The clock to compare with.
+     */
+    void update(const LamportClock &other_clock) { clock = std::max(clock, other_clock.clock); }
+
+    /**
+     * Increment the clock.
+     */
+    void increment() { clock++; }
+
+    /**
+     * Constructor.
+     *
+     * @param id The id of the thread.
+     */
+    LamportClock(int id) : clock(0), id(id), _mutex(){};
+
+    /**
+     * Constructor.
+     *
+     * @param clock The clock to copy.
+     */
+    LamportClock(const LamportClock &clock) : clock(clock.clock), id(clock.id), _mutex(){};
+
+    int clock;         ///< Lamport clock
+    int id;            ///< Id of the thread
+    std::mutex _mutex; ///< Mutex responsible for locking the clock
 };
 
 /**
