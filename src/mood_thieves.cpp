@@ -107,7 +107,7 @@ void MoodThieve::receiveMessages()
 void MoodThieve::business_logic()
 {
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+    bool first = true;
     while (1)
     {
         if (end.load())
@@ -135,6 +135,12 @@ void MoodThieve::business_logic()
         else
         {
             message_data_vector_mutex.unlock();
+        }
+
+        if (first)
+        {
+            first = false;
+            MPI_Barrier(MPI_COMM_WORLD);
         }
 
         // Wait until the first message in the queue is the current process
