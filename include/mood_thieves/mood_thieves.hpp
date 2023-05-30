@@ -47,11 +47,6 @@ private:
     void sendRelease(int resource_type);
 
     /**
-     * Receives messages from other thieves until the end flag is set.
-     */
-    void receiveMessages();
-
-    /**
      * Checks whether thieve's clock is the smallest among all other thieves.
      *
      * @return True if the thief's clock is the smallest, false otherwise.
@@ -63,7 +58,7 @@ private:
     int size;                  ///< The total number of thieves.
 
     std::atomic<bool> end{false};                 ///< Flag to indicate that the thief receiving thread should end.
-    std::thread receiving_thread;                 ///< The thread that receives messages from other thieves.
+    std::thread logic_thread;                     ///< The thread responsible for handling business logic.
     std::vector<utils::message_t> message_vector; ///< The queue of messages received from other thieves.
     int *clocks;                                  ///< The Lamport clocks of other thieves.
 
@@ -83,9 +78,14 @@ public:
     ~MoodThieve();
 
     /**
-     * Start the thief.
+     * Business logic of the thief in an infinity loop.
      */
-    void start();
+    void business_logic();
+
+    /**
+     * Receives messages from other thieves in an infinity loop.
+     */
+    void receiveMessages();
 };
 
 } // namespace mood_thieves

@@ -14,7 +14,7 @@ void startFunc(int rank, int size)
     mood_thieves::utils::initialize_message_type(message_type);
 
     mood_thieves::MoodThieve mood_thieve(message_type, rank, size);
-    mood_thieve.start();
+    mood_thieve.receiveMessages();
 
     printf("Finishing %d of %d\n", rank, size);
 }
