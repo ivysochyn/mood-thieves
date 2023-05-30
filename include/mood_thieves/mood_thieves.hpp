@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <mpi.h>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -54,13 +55,14 @@ private:
     bool isSmallestClock();
 
     utils::LamportClock clock; ///< The Lamport clock.
-    MPI_Datatype message_type; ///< The type of message to use for communication with other thieves.
+    MPI_Datatype msg_t;        ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
 
-    std::atomic<bool> end{false};                 ///< Flag to indicate that the thief receiving thread should end.
-    std::thread logic_thread;                     ///< The thread responsible for handling business logic.
-    std::vector<utils::message_t> message_vector; ///< The queue of messages received from other thieves.
-    int *clocks;                                  ///< The Lamport clocks of other thieves.
+    std::atomic<bool> end{false};         ///< Flag to indicate that the thief receiving thread should end.
+    std::mutex message_data_vector_mutex; ///< Mutex to protect the message data vector.
+    std::thread logic_thread;             ///< The thread responsible for handling business logic.
+
+    std::vector<utils::message_data_t> message_data_vector; ///< The queue of messages received from other thieves.
 
 public:
     /**

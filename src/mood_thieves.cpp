@@ -5,22 +5,15 @@
 namespace mood_thieves
 {
 
-MoodThieve::MoodThieve(MPI_Datatype message_type, int id, int size)
-    : clock(utils::LamportClock{id}), message_type(message_type), size(size)
+MoodThieve::MoodThieve(MPI_Datatype msg_t, int id, int size) : clock(utils::LamportClock{id}), msg_t(msg_t), size(size)
 {
     logic_thread = std::thread(&MoodThieve::business_logic, this);
-    clocks = (int *)malloc(size * sizeof(int));
-    for (int i = 0; i < size; i++)
-    {
-        clocks[i] = 0;
-    }
 }
 
 MoodThieve::~MoodThieve()
 {
     end.store(true);
     logic_thread.join();
-    free(clocks);
 }
 
 void MoodThieve::receiveMessages()
@@ -44,7 +37,7 @@ void MoodThieve::receiveMessages()
         }
 
         message_data = {-1, -1, -1};
-        MPI_Recv(&message_data, 1, message_type, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&message_data, 1, msg_t, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
         if (DEBUG)
         {
@@ -54,9 +47,6 @@ void MoodThieve::receiveMessages()
                    message_data.resource_type);
         }
         utils::message_t message = {status.MPI_TAG, message_data};
-
-        // Update the clocks status with the latest clock
-        clocks[message_data.id] = message_data.clock;
 
         // Update the clock
         clock.lock();
@@ -68,19 +58,21 @@ void MoodThieve::receiveMessages()
         if (status.MPI_TAG == utils::MessageType::REQUEST)
         {
             // Add the message to the vector of messages and sort it in descending order
-            message_vector.push_back(message);
-            std::sort(message_vector.begin(), message_vector.end(),
-                      [](const utils::message_t &a, const utils::message_t &b)
+            message_data_vector_mutex.lock();
+            message_data_vector.push_back(message.data);
+            std::sort(message_data_vector.begin(), message_data_vector.end(),
+                      [](const utils::message_data_t &a, const utils::message_data_t &b)
                       {
-                          if (a.data.clock == b.data.clock)
+                          if (a.clock == b.clock)
                           {
-                              return a.data.id < b.data.id;
+                              return a.id < b.id;
                           }
                           else
                           {
-                              return a.data.clock < b.data.clock;
+                              return a.clock < b.clock;
                           }
                       });
+            message_data_vector_mutex.unlock();
             clock.lock();
             clock.increment();
             sendAck(message_data.resource_type, message_data.id);
@@ -89,10 +81,12 @@ void MoodThieve::receiveMessages()
         else if (status.MPI_TAG == utils::MessageType::RELEASE)
         {
             // Remove the message from the vector of messages
-            message_vector.erase(std::remove_if(message_vector.begin(), message_vector.end(),
-                                                [message](const utils::message_t &m)
-                                                { return m.data.id == message.data.id; }),
-                                 message_vector.end());
+            message_data_vector_mutex.unlock();
+            message_data_vector.erase(std::remove_if(message_data_vector.begin(), message_data_vector.end(),
+                                                     [message](const utils::message_data_t &m)
+                                                     { return m.id == message.data.id; }),
+                                      message_data_vector.end());
+            message_data_vector_mutex.unlock();
         }
     }
 }
@@ -114,35 +108,43 @@ void MoodThieve::business_logic()
             break;
         }
 
-        clock.lock();
         // if can't find a request with clock id equal to this clock.id
-        if (std::find_if(message_vector.begin(), message_vector.end(),
-                         [this](const utils::message_t &m)
-                         { return m.data.id == this->clock.id; }) == message_vector.end())
+        message_data_vector_mutex.lock();
+        if (std::find_if(message_data_vector.begin(), message_data_vector.end(),
+                         [this](const utils::message_data_t &m)
+                         { return m.id == this->clock.id; }) == message_data_vector.end())
         {
+            // NOTE: Possible deadlock here
+            clock.lock();
             clock.increment();
             sendRequest(utils::ResourceType::WEAPON);
+            clock.unlock();
         }
-        clock.unlock();
+        message_data_vector_mutex.unlock();
 
-        if (message_vector.size() == 0)
+        message_data_vector_mutex.lock();
+        if (message_data_vector.size() == 0)
         {
+            message_data_vector_mutex.unlock();
             continue;
         }
+
         // If the first message is from the thief itself
-        if (message_vector[0].data.id == clock.id)
+        if (message_data_vector[0].id == clock.id)
         {
             // FIXME: Remove this message
+            message_data_vector_mutex.unlock();
             printf("Thief %d is stealing the weapon\n", clock.id);
             sleep(3);
             clock.lock();
             clock.increment();
-            message_vector.erase(message_vector.begin());
             sendRelease(utils::ResourceType::WEAPON);
             clock.unlock();
             // FIXME: Remove this message
             printf("Thief %d has released the weapon\n", clock.id);
+            continue;
         }
+        message_data_vector_mutex.unlock();
     }
 }
 
@@ -151,7 +153,7 @@ void MoodThieve::sendRequest(int resource_type) { sendMessage(utils::MessageType
 void MoodThieve::sendAck(int resource_type, int thief_id)
 {
     utils::message_data_t message_data = {clock.id, clock.clock, resource_type};
-    MPI_Send(&message_data, 1, this->message_type, thief_id, utils::MessageType::ACK, MPI_COMM_WORLD);
+    MPI_Send(&message_data, 1, msg_t, thief_id, utils::MessageType::ACK, MPI_COMM_WORLD);
 }
 
 void MoodThieve::sendRelease(int resource_type) { sendMessage(utils::MessageType::RELEASE, resource_type); }
@@ -161,7 +163,7 @@ void MoodThieve::sendMessage(int message_type, int resource_type)
     utils::message_data_t message_data = {clock.id, clock.clock, resource_type};
     for (int i = 0; i < size; i++)
     {
-        MPI_Send(&message_data, 1, this->message_type, i, message_type, MPI_COMM_WORLD);
+        MPI_Send(&message_data, 1, msg_t, i, message_type, MPI_COMM_WORLD);
     }
 }
 
