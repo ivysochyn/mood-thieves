@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mpi.h>
+#include <mutex>
 
 namespace mood_thieves
 {
@@ -23,34 +24,72 @@ enum MessageType
 };
 
 /**
+ * Struct to hold data for a messages to send.
+ */
+struct message_data_t
+{
+    int id;            ///< Id of the thread
+    int clock;         ///< Lamport clock value
+    int resource_type; ///< Type of the resource
+};
+
+/**
+ * Struct to hold a message to receive.
+ */
+struct message_t
+{
+    int type;            ///< Type of the message
+    message_data_t data; ///< Data of the message
+};
+
+/**
  * Struct to hold the Lamport clock and the id of the thread.
  */
 struct LamportClock
 {
     /**
-     * Increment the clock by one.
+     * Lock the clock.
+     *
+     * Applies the mutex to the clock.
+     */
+    void lock() { _mutex.lock(); }
+
+    /**
+     * Unlock the clock.
+     *
+     * Releases the mutex from the clock.
+     */
+    void unlock() { _mutex.unlock(); }
+
+    /**
+     * Update the clock with the maximum of the current clock and the given clock.
+     *
+     * @param other_clock The clock to compare with.
+     */
+    void update(const LamportClock &other_clock) { clock = std::max(clock, other_clock.clock); }
+
+    /**
+     * Increment the clock.
      */
     void increment() { clock++; }
 
     /**
-     * Decrement the clock by one.
+     * Constructor.
+     *
+     * @param id The id of the thread.
      */
-    void decrement() { clock--; }
+    LamportClock(int id) : clock(0), id(id), _mutex(){};
 
-    int clock; ///< Lamport clock
-    int id;    ///< Id of the thread
-};
+    /**
+     * Constructor.
+     *
+     * @param clock The clock to copy.
+     */
+    LamportClock(const LamportClock &clock) : clock(clock.clock), id(clock.id), _mutex(){};
 
-/**
- * Struct to hold data for a messages to send.
- */
-struct message_data_t
-{
-    // Personal clock for each thread
-    LamportClock clock;
-
-    // Type of the util the message is about
-    int resource_type;
+    int clock;         ///< Lamport clock
+    int id;            ///< Id of the thread
+    std::mutex _mutex; ///< Mutex responsible for locking the clock
 };
 
 /**

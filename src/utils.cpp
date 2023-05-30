@@ -31,14 +31,15 @@ int check_thread_support(int provided)
 
 void initialize_message_type(MPI_Datatype &MPI_PAKIET_T)
 {
-    const int nitems = 2;
-    int blocklengths[nitems] = {1, 1};
-    MPI_Datatype typy[nitems] = {MPI_INT, MPI_INT};
+    const int nitems = 3;
+    int blocklengths[nitems] = {1, 1, 1};
+    MPI_Datatype typy[nitems] = {MPI_INT, MPI_INT, MPI_INT};
     MPI_Aint offsets[nitems];
 
     // Set the offsets for each field
     offsets[0] = offsetof(LamportClock, clock);
     offsets[1] = offsetof(LamportClock, id);
+    offsets[2] = offsetof(message_data_t, resource_type);
 
     MPI_Type_create_struct(nitems, blocklengths, offsets, typy, &MPI_PAKIET_T);
     MPI_Type_commit(&MPI_PAKIET_T);

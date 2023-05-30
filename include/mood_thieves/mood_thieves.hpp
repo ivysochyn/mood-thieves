@@ -1,8 +1,11 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <mpi.h>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 #include "mood_thieves/utils.hpp"
 
@@ -46,16 +49,23 @@ private:
     void sendRelease(int resource_type);
 
     /**
-     * Receives messages from other thieves until the end flag is set.
+     * Checks whether thieve's clock is the smallest among all other thieves.
+     *
+     * @return True if the thief's clock is the smallest, false otherwise.
      */
-    void receiveMessages();
+    bool isSmallestClock();
 
     utils::LamportClock clock; ///< The Lamport clock.
-    MPI_Datatype message_type; ///< The type of message to use for communication with other thieves.
+    MPI_Datatype msg_t;        ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
 
-    std::atomic<bool> end{false}; ///< Flag to indicate that the thief receiving thread should end.
-    std::thread receiving_thread; ///< The thread that receives messages from other thieves.
+    std::atomic<bool> end{false};         ///< Flag to indicate that the thief receiving thread should end.
+    std::mutex message_data_vector_mutex; ///< Mutex to protect the message data vector.
+    std::thread logic_thread;             ///< The thread responsible for handling business logic.
+    std::condition_variable cv;           ///< Condition variable to unsleep the business logic thread;
+    std::mutex cv_mutex;                  ///< Mutex to protect the condition variable.
+
+    std::vector<utils::message_data_t> message_data_vector; ///< The queue of messages received from other thieves.
 
 public:
     /**
@@ -73,9 +83,14 @@ public:
     ~MoodThieve();
 
     /**
-     * Start the thief.
+     * Business logic of the thief in an infinity loop.
      */
-    void start();
+    void business_logic();
+
+    /**
+     * Receives messages from other thieves in an infinity loop.
+     */
+    void receiveMessages();
 };
 
 } // namespace mood_thieves
