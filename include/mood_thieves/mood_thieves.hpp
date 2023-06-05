@@ -49,23 +49,23 @@ private:
     void sendRelease(int resource_type);
 
     /**
-     * Checks whether thieve's clock is the smallest among all other thieves.
+     * Checks whether thieve can enter the critical section of weapons.
      *
-     * @return True if the thief's clock is the smallest, false otherwise.
+     * @return True if the thief can enter the critical section of weapons, false otherwise.
      */
-    bool isSmallestClock();
+    bool isWeapon();
 
     utils::LamportClock clock; ///< The Lamport clock.
     MPI_Datatype msg_t;        ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
 
-    std::atomic<bool> end{false};         ///< Flag to indicate that the thief receiving thread should end.
-    std::mutex message_data_vector_mutex; ///< Mutex to protect the message data vector.
-    std::thread logic_thread;             ///< The thread responsible for handling business logic.
-    std::condition_variable cv;           ///< Condition variable to unsleep the business logic thread;
-    std::mutex cv_mutex;                  ///< Mutex to protect the condition variable.
+    std::atomic<bool> end{false}; ///< Flag to indicate that the thief receiving thread should end.
+    std::thread logic_thread;     ///< The thread responsible for handling business logic.
+    std::condition_variable cv;   ///< Condition variable to unsleep the business logic thread;
+    std::mutex cv_mutex;          ///< Mutex to protect the condition variable.
 
-    std::vector<utils::message_data_t> message_data_vector; ///< The queue of messages received from other thieves.
+    std::vector<utils::message_data_t> weapons_data_vector; ///< The queue of requests for a weapon.
+    std::mutex weapons_data_vector_mutex;                   ///< Mutex to protect the weapon requests queue.
 
 public:
     /**

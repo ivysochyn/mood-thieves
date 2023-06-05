@@ -1,5 +1,8 @@
 #include "mood_thieves/mood_thieves.hpp"
 #define DEBUG false
+#define LABORATORIES_N 1
+#define SLEEP_TIME 1
+#define WEAPONS_N 2
 #include <algorithm>
 
 namespace mood_thieves
@@ -59,9 +62,9 @@ void MoodThieve::receiveMessages()
         if (status.MPI_TAG == utils::MessageType::REQUEST)
         {
             // Add the message to the vector of messages and sort it in descending order
-            message_data_vector_mutex.lock();
-            message_data_vector.push_back(message.data);
-            std::sort(message_data_vector.begin(), message_data_vector.end(),
+            weapons_data_vector_mutex.lock();
+            weapons_data_vector.push_back(message.data);
+            std::sort(weapons_data_vector.begin(), weapons_data_vector.end(),
                       [](const utils::message_data_t &a, const utils::message_data_t &b)
                       {
                           if (a.clock == b.clock)
@@ -73,7 +76,7 @@ void MoodThieve::receiveMessages()
                               return a.clock < b.clock;
                           }
                       });
-            message_data_vector_mutex.unlock();
+            weapons_data_vector_mutex.unlock();
             if (message.data.id == clock.id)
             {
                 cv.notify_one();
@@ -82,24 +85,27 @@ void MoodThieve::receiveMessages()
             clock.increment();
             sendAck(message_data.resource_type, message_data.id);
             clock.unlock();
+
+            if (isWeapon())
+            {
+                weapons_data_vector_mutex.lock();
+                cv.notify_one();
+                weapons_data_vector_mutex.unlock();
+            }
         }
         else if (status.MPI_TAG == utils::MessageType::RELEASE)
         {
             // Remove the message from the vector of messages
-            message_data_vector_mutex.lock();
-            message_data_vector.erase(std::remove_if(message_data_vector.begin(), message_data_vector.end(),
+            weapons_data_vector_mutex.lock();
+            weapons_data_vector.erase(std::remove_if(weapons_data_vector.begin(), weapons_data_vector.end(),
                                                      [message](const utils::message_data_t &m)
                                                      { return m.id == message.data.id; }),
-                                      message_data_vector.end());
-            if (message_data_vector.size() > 0 && message_data_vector[0].id == clock.id)
+                                      weapons_data_vector.end());
+            if (weapons_data_vector.size() > 0 && isWeapon())
             {
-                message_data_vector_mutex.unlock();
                 cv.notify_one();
             }
-            else
-            {
-                message_data_vector_mutex.unlock();
-            }
+            weapons_data_vector_mutex.unlock();
         }
     }
 }
@@ -116,17 +122,17 @@ void MoodThieve::business_logic()
         }
 
         // Check whether in a queue
-        message_data_vector_mutex.lock();
-        if (std::find_if(message_data_vector.begin(), message_data_vector.end(),
+        weapons_data_vector_mutex.lock();
+        if (std::find_if(weapons_data_vector.begin(), weapons_data_vector.end(),
                          [this](const utils::message_data_t &m)
-                         { return m.id == this->clock.id; }) == message_data_vector.end())
+                         { return m.id == this->clock.id; }) == weapons_data_vector.end())
         {
             // Send request for a critical section
             clock.lock();
             clock.increment();
             sendRequest(utils::ResourceType::WEAPON);
             clock.unlock();
-            message_data_vector_mutex.unlock();
+            weapons_data_vector_mutex.unlock();
 
             // Wait until this process request is in the queue
             std::unique_lock<std::mutex> lk(cv_mutex);
@@ -134,7 +140,7 @@ void MoodThieve::business_logic()
         }
         else
         {
-            message_data_vector_mutex.unlock();
+            weapons_data_vector_mutex.unlock();
         }
 
         if (first)
@@ -144,21 +150,21 @@ void MoodThieve::business_logic()
         }
 
         // Wait until the first message in the queue is the current process
-        message_data_vector_mutex.lock();
-        if (message_data_vector[0].id != clock.id)
+        weapons_data_vector_mutex.lock();
+        if (!isWeapon())
         {
-            message_data_vector_mutex.unlock();
+            weapons_data_vector_mutex.unlock();
             std::unique_lock<std::mutex> lk(cv_mutex);
             cv.wait(lk);
         }
         else
         {
-            message_data_vector_mutex.unlock();
+            weapons_data_vector_mutex.unlock();
         }
 
         // Critical section
         printf("\n[%d] STEAL\n", clock.id);
-        sleep(3);
+        sleep(SLEEP_TIME);
         printf("[%d] RELEASE\n", clock.id);
 
         // Leave the critical section and send release message
@@ -168,13 +174,35 @@ void MoodThieve::business_logic()
         clock.unlock();
 
         // Remove the message from the vector of messages (in order not to re-enter the critical section)
-        message_data_vector_mutex.lock();
-        message_data_vector.erase(std::remove_if(message_data_vector.begin(), message_data_vector.end(),
+        weapons_data_vector_mutex.lock();
+        weapons_data_vector.erase(std::remove_if(weapons_data_vector.begin(), weapons_data_vector.end(),
                                                  [this](const utils::message_data_t &m)
                                                  { return m.id == this->clock.id; }),
-                                  message_data_vector.end());
-        message_data_vector_mutex.unlock();
+                                  weapons_data_vector.end());
+        weapons_data_vector_mutex.unlock();
     }
+}
+
+bool MoodThieve::isWeapon()
+{
+    if (weapons_data_vector.size() < static_cast<size_t>(size))
+    {
+        return false;
+    }
+    int counter = 0;
+    for (auto &m : weapons_data_vector)
+    {
+        if (m.id == clock.id)
+        {
+            return true;
+        }
+        counter++;
+        if (counter == WEAPONS_N)
+        {
+            break;
+        }
+    }
+    return false;
 }
 
 void MoodThieve::sendRequest(int resource_type) { sendMessage(utils::MessageType::REQUEST, resource_type); }
