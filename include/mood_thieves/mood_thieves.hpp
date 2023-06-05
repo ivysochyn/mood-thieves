@@ -55,17 +55,32 @@ private:
      */
     bool isWeapon();
 
+    /**
+     * Checks whether thieve can enter the critical section of lobaroatories.
+     *
+     * @return True if the thief can enter the critical section of lobarotories, false otherwise.
+     */
+    bool isLaboratory();
+
     utils::LamportClock clock; ///< The Lamport clock.
     MPI_Datatype msg_t;        ///< The type of message to use for communication with other thieves.
     int size;                  ///< The total number of thieves.
 
     std::atomic<bool> end{false}; ///< Flag to indicate that the thief receiving thread should end.
     std::thread logic_thread;     ///< The thread responsible for handling business logic.
-    std::condition_variable cv;   ///< Condition variable to unsleep the business logic thread;
-    std::mutex cv_mutex;          ///< Mutex to protect the condition variable.
+    std::condition_variable wv;   ///< Condition variable to unsleep the business logic thread for a weapon;
+    std::condition_variable lv;   ///< Condition variable to unsleep the business logic thread for a laboratory;
+    std::mutex wv_mutex;          ///< Mutex to protect the condition variable for weapons.
+    std::mutex lv_mutex;          ///< Mutex to protect the condition variable for laboratories.
+    std::mutex new_mutex;          ///< Mutex to protect the condition variable for laboratories.
 
-    std::vector<utils::message_data_t> weapons_data_vector; ///< The queue of requests for a weapon.
-    std::mutex weapons_data_vector_mutex;                   ///< Mutex to protect the weapon requests queue.
+    std::vector<utils::message_data_t> weapons_data_vector;      ///< The queue of requests for a weapon.
+    std::vector<utils::message_data_t> laborotories_data_vector; ///< The queue of requests for a weapon.
+    std::mutex weapons_data_vector_mutex;                        ///< Mutex to protect the weapon requests queue.
+    std::mutex laborotories_data_vector_mutex;                   ///< Mutex to protect the weapon requests queue.
+
+    int weapons_ack = 0;
+    int laboratories_ack = 0;
 
 public:
     /**
